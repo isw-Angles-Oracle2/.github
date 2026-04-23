@@ -29,7 +29,7 @@ jobs:
                 `Current branch name: "${branchName}"\n\n` +
                 `Expected format examples:\n` +
                 `  - PR title: [ANGO-123] Description or ANGO-123: Description\n` +
-                `  - Branch name: feature/ANGO-123-description or ANGO-123-fix-bug`
+                `  - Branch name: feature/ANGO-123-description or ANGO-123-fix-bug or copilot/`
               );
             } else {
               if (titleHasJira) {
