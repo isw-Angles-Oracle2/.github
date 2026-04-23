@@ -1,0 +1,41 @@
+name: Validate JIRA ID (Reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  validate-pr-title:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check for JIRA ID in PR title or branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prTitle = context.payload.pull_request.title;
+            const branchName = context.payload.pull_request.head.ref;
+
+            // Regex pattern to match JIRA IDs with ANGO project key (e.g., ANGO-123, ANGO-456)
+            // Modify this pattern to match your JIRA project keys
+            const jiraPattern = /\bANGO-\d+\b/;
+
+            const titleHasJira = jiraPattern.test(prTitle);
+            const branchHasJira = jiraPattern.test(branchName);
+
+            if (!titleHasJira && !branchHasJira) {
+              core.setFailed(
+                `❌ JIRA ID must be present in either the PR title or branch name\n\n` +
+                `Current PR title: "${prTitle}"\n` +
+                `Current branch name: "${branchName}"\n\n` +
+                `Expected format examples:\n` +
+                `  - PR title: [ANGO-123] Description or ANGO-123: Description\n` +
+                `  - Branch name: feature/ANGO-123-description or ANGO-123-fix-bug`
+              );
+            } else {
+              if (titleHasJira) {
+                core.info(`✅ JIRA ID found in PR title: "${prTitle}"`);
+              }
+              if (branchHasJira) {
+                core.info(`✅ JIRA ID found in branch name: "${branchName}"`);
+              }
+            }
