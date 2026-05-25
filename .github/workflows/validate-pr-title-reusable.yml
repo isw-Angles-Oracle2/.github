@@ -1,44 +1,48 @@
 name: Validate JIRA ID
 on:
   workflow_call:
+    inputs:
+      pr_title:
+        required: true
+        type: string
+      branch_name:
+        required: true
+        type: string
   pull_request:
     types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
 jobs:
   validate-pr-title:
     runs-on: ubuntu-latest
     steps:
       - name: Check for JIRA ID in PR title or branch
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prTitle = context.payload.pull_request.title;
-            const branchName = context.payload.pull_request.head.ref;
-            // Regex pattern to match JIRA IDs with ANGO project key (e.g., ANGO-123, ANGO-456)
-            // Modify this pattern to match your JIRA project keys
-            const jiraPattern = /\bANGO-\d+\b/;
-            // Bypass patterns for automated/tool branches that don't require a JIRA ID
-            const bypassPatterns = [/^copilot\//i, /^snyk\//i, /^sonar\//i];
-            const isBypassBranch = bypassPatterns.some(p => p.test(branchName));
-            if (isBypassBranch) {
-              core.info(`✅ Branch "${branchName}" is an automated branch — JIRA ID check bypassed.`);
-            } else {
-              const titleHasJira = jiraPattern.test(prTitle);
-              const branchHasJira = jiraPattern.test(branchName);
-              if (!titleHasJira && !branchHasJira) {
-                core.setFailed(
-                  `❌ JIRA ID must be present in either the PR title or branch name\n\n` +
-                  `Current PR title: "${prTitle}"\n` +
-                  `Current branch name: "${branchName}"\n\n` +
-                  `Expected format examples:\n` +
-                  `  - PR title: [ANGO-123] Description or ANGO-123: Description\n` +
-                  `  - Branch name: feature/ANGO-123-description or ANGO-123-fix-bug`
-                );
-              } else {
-                if (titleHasJira) {
-                  core.info(`✅ JIRA ID found in PR title: "${prTitle}"`);
-                }
-                if (branchHasJira) {
-                  core.info(`✅ JIRA ID found in branch name: "${branchName}"`);
-                }
-              }
-            }
+        env:
+          PR_TITLE: ${{ inputs.pr_title || github.event.pull_request.title }}
+          BRANCH_NAME: ${{ inputs.branch_name || github.event.pull_request.head.ref }}
+        run: |													 
+          JIRA_PATTERN="ANGO-[0-9]+"
+          BYPASS_PATTERNS=("^copilot/" "^snyk/" "^sonar/")
+          for pattern in "${BYPASS_PATTERNS[@]}"; do
+            if echo "$BRANCH_NAME" | grep -qiE "$pattern"; then
+              echo "✅ Branch '$BRANCH_NAME' is an automated branch — JIRA ID check bypassed."
+              exit 0
+            fi
+          done
+          TITLE_HAS_JIRA=$(echo "$PR_TITLE" | grep -oE "$JIRA_PATTERN" || true)
+          BRANCH_HAS_JIRA=$(echo "$BRANCH_NAME" | grep -oE "$JIRA_PATTERN" || true)
+          if [ -z "$TITLE_HAS_JIRA" ] && [ -z "$BRANCH_HAS_JIRA" ]; then
+            echo "❌ JIRA ID must be present in either the PR title or branch name"
+            echo ""
+            echo "Current PR title: '$PR_TITLE'"
+            echo "Current branch name: '$BRANCH_NAME'"
+            echo ""
+            echo "Expected format examples:"
+            echo "  - PR title: [ANGO-123] Description or ANGO-123: Description"
+            echo "  - Branch name: feature/ANGO-123-description or ANGO-123-fix-bug"
+            exit 1
+          fi
+          [ -n "$TITLE_HAS_JIRA" ] && echo "✅ JIRA ID found in PR title: '$PR_TITLE'"						
+          [ -n "$BRANCH_HAS_JIRA" ] && echo "✅ JIRA ID found in branch name: '$BRANCH_NAME'"
