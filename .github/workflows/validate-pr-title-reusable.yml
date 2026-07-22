@@ -1,48 +1,29 @@
-name: Validate JIRA ID
+name: PR Title JIRA Validation
+
 on:
   workflow_call:
     inputs:
       pr_title:
         required: true
         type: string
-      branch_name:
-        required: true
-        type: string
-  pull_request:
-    types: [opened, edited, synchronize, reopened]
 
 permissions:
   pull-requests: read
 
 jobs:
   validate-pr-title:
+    name: PR Title JIRA Validation
     runs-on: ubuntu-latest
     steps:
-      - name: Check for JIRA ID in PR title or branch
+      - name: Validate PR title
         env:
-          PR_TITLE: ${{ inputs.pr_title || github.event.pull_request.title }}
-          BRANCH_NAME: ${{ inputs.branch_name || github.event.pull_request.head.ref }}
-        run: |													 
-          JIRA_PATTERN="ANGO-[0-9]+"
-          BYPASS_PATTERNS=("^copilot/" "^snyk/" "^sonar/")
-          for pattern in "${BYPASS_PATTERNS[@]}"; do
-            if echo "$BRANCH_NAME" | grep -qiE "$pattern"; then
-              echo "✅ Branch '$BRANCH_NAME' is an automated branch — JIRA ID check bypassed."
-              exit 0
-            fi
-          done
-          TITLE_HAS_JIRA=$(echo "$PR_TITLE" | grep -oE "$JIRA_PATTERN" || true)
-          BRANCH_HAS_JIRA=$(echo "$BRANCH_NAME" | grep -oE "$JIRA_PATTERN" || true)
-          if [ -z "$TITLE_HAS_JIRA" ] && [ -z "$BRANCH_HAS_JIRA" ]; then
-            echo "❌ JIRA ID must be present in either the PR title or branch name"
-            echo ""
-            echo "Current PR title: '$PR_TITLE'"
-            echo "Current branch name: '$BRANCH_NAME'"
-            echo ""
-            echo "Expected format examples:"
-            echo "  - PR title: [ANGO-123] Description or ANGO-123: Description"
-            echo "  - Branch name: feature/ANGO-123-description or ANGO-123-fix-bug"
+          PR_TITLE: ${{ inputs.pr_title }}
+        run: |
+          echo "Validating PR title: '$PR_TITLE'"
+
+          if echo "$PR_TITLE" | grep -Eq '^(ANGO-[0-9]+|\[ANGO-[0-9]+\])(\s*:\s*.*)?$'; then
+            echo "✅ PR title is valid."
+          else
+            echo "❌ PR title must start with ANGO-1234 or [ANGO-1234], optionally followed by ':' and description."
             exit 1
           fi
-          [ -n "$TITLE_HAS_JIRA" ] && echo "✅ JIRA ID found in PR title: '$PR_TITLE'"						
-          [ -n "$BRANCH_HAS_JIRA" ] && echo "✅ JIRA ID found in branch name: '$BRANCH_NAME'"
